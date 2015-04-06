@@ -21,10 +21,10 @@ class Articles(object):
         else:
             last_revision = rev_list[-1]
             if last_revision[2] != date or last_revision[3] != title or last_revision[4] != body:
-                log.info('entry changed: %s', url)
+                log.info('new entry version: %s', url)
                 self.save(url, len(rev_list), date, title, body)
             else:
-                log.debug('entry not changed: %s', url)
+                log.debug('entry not modified: %s', url)
 
     def save(self, url, version, date, title, body):
         self.conn.execute('insert into article values (?, ?, ?, ?, ?, ?)',
@@ -35,3 +35,8 @@ class Articles(object):
         self.conn.execute('''create table if not exists article
         (url text, version integer, date text, title text, body text, capture_time timestamp)''')
         self.conn.execute('create unique index if not exists url_version on article(url, version)')
+
+    def get_all_urls(self):
+        cur = self.conn.cursor()
+        cur.execute('select distinct url from article')
+        return [x[0] for x in cur.fetchall()]
