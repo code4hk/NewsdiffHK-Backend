@@ -1,3 +1,4 @@
+from util.env import log_dir
 import logging
 
 
@@ -10,7 +11,7 @@ def get(name):
     log = logging.getLogger(name)
     log.setLevel(logging.DEBUG)
     formatter = MyFormatter('%(asctime)s:%(levelname)s:%(message)s')
-    ch = logging.FileHandler('/tmp/news_diff.log')
+    ch = logging.FileHandler(log_dir() + '/news_diff.log')
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     log.addHandler(ch)

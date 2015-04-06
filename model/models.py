@@ -1,3 +1,4 @@
+from util.env import data_dir
 from datetime import datetime
 from util import logger
 import sqlite3
@@ -8,7 +9,7 @@ log = logger.get(__name__)
 
 class Articles(object):
     def __init__(self):
-        self.conn = sqlite3.connect('articles.db')
+        self.conn = sqlite3.connect(data_dir() + '/articles.db')
         self.create_table_if_not_exist()
 
     def save_revision(self, url, date, title, body):
@@ -36,9 +37,15 @@ class Articles(object):
         self.conn.execute('update article set last_check = ? where url = ?', (datetime.now(), url,))
         self.conn.commit()
 
-    def load_modified(self):
+    def load_modified_url(self):
         return self.conn.execute(
-            'select *, count(*) count from article group by url having count(*) > 1').fetchall()
+            'select url from article group by url having count(*) > 1').fetchall()
+
+    def load_modified_news(self):
+        return self.conn.execute(
+            '''select * from article where url in
+            (select url from article group by url having count(*) > 1)
+            order by url''').fetchall()
 
     def create_table_if_not_exist(self):
         self.conn.execute('''create table if not exists article
