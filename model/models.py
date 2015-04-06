@@ -1,5 +1,5 @@
+from datetime import datetime
 from util import logger
-import datetime
 import sqlite3
 
 
@@ -25,18 +25,28 @@ class Articles(object):
                 self.save(url, len(rev_list), date, title, body)
             else:
                 log.debug('entry not modified: %s', url)
+                self.update_last_check_time(url)
 
     def save(self, url, version, date, title, body):
-        self.conn.execute('insert into article values (?, ?, ?, ?, ?, ?)',
-                          (url, version, date, title, body, datetime.datetime.now()))
+        self.conn.execute('insert into article values (?, ?, ?, ?, ?, ?, ?)',
+                          (url, version, date, title, body, datetime.now(), datetime.now()))
         self.conn.commit()
+
+    def update_last_check_time(self, url):
+        self.conn.execute('update article set last_check = ? where url = ?', (datetime.now(), url,))
+        self.conn.commit()
+
+    def load_modified(self):
+        return self.conn.execute(
+            'select *, count(*) count from article group by url having count(*) > 1').fetchall()
 
     def create_table_if_not_exist(self):
         self.conn.execute('''create table if not exists article
-        (url text, version integer, date text, title text, body text, capture_time timestamp)''')
+        (url text, version integer, date text, title text, body text, capture_time timestamp,
+        last_check timestamp default '1901-01-01')''')
         self.conn.execute('create unique index if not exists url_version on article(url, version)')
 
-    def get_all_urls(self):
-        cur = self.conn.cursor()
-        cur.execute('select distinct url from article')
-        return [x[0] for x in cur.fetchall()]
+    def get_all_urls_older_than(self, interval):
+        urls = self.conn.execute(''' select distinct url from article
+        where strftime('%s','now') - strftime('%s',last_check) > ? ''', (interval * 60,)).fetchall()
+        return [x[0] for x in urls]
