@@ -13,6 +13,13 @@ To create a virtual environment and install the dependencies:
     $ source newsdiff/bin/activate
     $ pip3 install -r requirements.txt
 
+To run the scraper:
+	
+	$ python3 main.py &
+
+To track the log:
+	$ tail news_diff.log -f
+
 To deactivate the virtual environment after use:
 
     $ deactivate
