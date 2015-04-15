@@ -7,6 +7,11 @@ Inspired by and modified from similar projects in [Taiwan](https://github.com/ro
 
 Dev Environment Setup
 ---------------------
+
+Install mongodb and start it up:
+
+    $mongod --dbpath <path to ur dev db>
+
 To create a virtual environment and install the dependencies:
 
     $ virtualenv -p python3 newsdiff
@@ -18,6 +23,7 @@ To run the scraper:
 	$ python3 main.py &
 
 To track the log:
+
 	$ tail news_diff.log -f
 
 To deactivate the virtual environment after use:

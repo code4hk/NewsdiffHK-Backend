@@ -1,17 +1,17 @@
 import os
 
 
-def data_dir():
-    openshift_data_dir = os.environ.get('OPENSHIFT_DATA_DIR')
-    if openshift_data_dir is None:
-        return os.path.dirname(os.path.abspath(__file__))+'/..'
-    else:
-        return openshift_data_dir
-
-
 def log_dir():
     openshift_log_dir = os.environ.get('OPENSHIFT_LOG_DIR')
-    if openshift_log_dir is None:
-        return os.path.dirname(os.path.abspath(__file__))+'/..'
-    else:
+    if openshift_log_dir:
         return openshift_log_dir
+    else:
+        return os.path.dirname(os.path.abspath(__file__)) + '/..'
+
+
+def db_url():
+    openshift_db_url = os.environ.get('OPENSHIFT_MONGODB_DB_URL')
+    if openshift_db_url:
+        return openshift_db_url
+    else:
+        return 'mongodb://localhost:27017/'

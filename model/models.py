@@ -1,7 +1,9 @@
-from util.env import data_dir
+from pymongo import DESCENDING
+from pymongo import MongoClient
+from datetime import timedelta
 from datetime import datetime
+from util.env import db_url
 from util import logger
-import sqlite3
 
 
 log = logger.get(__name__)
@@ -9,51 +11,50 @@ log = logger.get(__name__)
 
 class Articles(object):
     def __init__(self):
-        self.conn = sqlite3.connect(data_dir() + '/articles.db')
-        self.create_table_if_not_exist()
+        client = MongoClient(db_url())
+        self.db = client.newsdiff
+        self.articles = self.db.articles
 
     def save_revision(self, url, date, title, body):
-        cur = self.conn.cursor()
-        cur.execute('select * from article where url = ?', (url,))
-        rev_list = cur.fetchall()
-        if len(rev_list) == 0:
+        cursor = self.articles.find({"url": url})
+        count = cursor.count()
+        if count == 0:
             log.info('new entry: %s', url)
             self.save(url, 0, date, title, body)
         else:
-            last_revision = rev_list[-1]
-            if last_revision[2] != date or last_revision[3] != title or last_revision[4] != body:
+            last_revision = cursor[count - 1]
+            if last_revision["published_at"] != date or last_revision["title"] != title or last_revision["body"] != body:
                 log.info('new entry version: %s', url)
-                self.save(url, len(rev_list), date, title, body)
+                self.save(url, count, date, title, body)
             else:
                 log.debug('entry not modified: %s', url)
                 self.update_last_check_time(url)
 
     def save(self, url, version, date, title, body):
-        self.conn.execute('insert into article values (?, ?, ?, ?, ?, ?, ?)',
-                          (url, version, date, title, body, datetime.now(), datetime.now()))
-        self.conn.commit()
+        entry = {"url": url,
+                 "version": version,
+                 "published_at": date,
+                 "title": title,
+                 "body": body,
+                 "created_at": datetime.utcnow(),
+                 "last_check": datetime.utcnow()
+                 }
+        self.articles.insert_one(entry)
 
     def update_last_check_time(self, url):
-        self.conn.execute('update article set last_check = ? where url = ?', (datetime.now(), url,))
-        self.conn.commit()
+        self.articles.update_many({"url": url}, {'$set': {"last_check": datetime.utcnow()}})
 
     def load_modified_url(self):
-        return self.conn.execute(
-            'select url from article group by url having count(*) > 1').fetchall()
+        cursor = self.articles.aggregate([
+            {"$group": {"_id": "$url", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$match": {"count": {"$gt": 1}}}
+        ])
+        return [i['_id'] for i in cursor]
 
     def load_modified_news(self):
-        return self.conn.execute(
-            '''select * from article where url in
-            (select url from article group by url having count(*) > 1)
-            order by url''').fetchall()
-
-    def create_table_if_not_exist(self):
-        self.conn.execute('''create table if not exists article
-        (url text, version integer, date text, title text, body text, capture_time timestamp,
-        last_check timestamp default '1901-01-01')''')
-        self.conn.execute('create unique index if not exists url_version on article(url, version)')
+        return list(self.articles.find({"url": {"$in": self.load_modified_url()}}).sort([('url', DESCENDING)]))[:100]
 
     def get_all_urls_older_than(self, interval):
-        urls = self.conn.execute(''' select distinct url from article
-        where strftime('%s','now') - strftime('%s',last_check) > ? ''', (interval * 60,)).fetchall()
-        return [x[0] for x in urls]
+        older_than = datetime.utcnow() - timedelta(seconds=interval * 60)
+        return self.articles.find({"last_check": {"$lt": older_than}}).distinct('url')
