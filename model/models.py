@@ -9,29 +9,41 @@ from util import logger
 log = logger.get(__name__)
 
 
+class Publishers(object):
+    def __init__(self):
+        client = MongoClient(db_url())
+        self.publishers = client.newsdiff.publishers
+
+    def create_publisher_if_not_exists(self, code, name):
+        self.publishers.replace_one({'code': code}, {'code': code, 'name': name}, upsert=True)
+
+    def load_publishers(self):
+        return list(self.publishers.find(projection={'_id': 0}))
+
+
 class Articles(object):
     def __init__(self):
         client = MongoClient(db_url())
-        self.db = client.newsdiff
-        self.articles = self.db.articles
+        self.articles = client.newsdiff.articles
 
-    def save_revision(self, url, date, title, body):
+    def save_revision(self, publisher, url, date, title, body):
         cursor = self.articles.find({"url": url})
         count = cursor.count()
         if count == 0:
             log.info('new entry: %s', url)
-            self.save(url, 0, date, title, body)
+            self.save(publisher, url, 0, date, title, body)
         else:
             last_revision = cursor[count - 1]
             if last_revision["published_at"] != date or last_revision["title"] != title or last_revision["body"] != body:
                 log.info('new entry version: %s', url)
-                self.save(url, count, date, title, body)
+                self.save(publisher, url, count, date, title, body)
             else:
                 log.debug('entry not modified: %s', url)
                 self.update_last_check_time(url)
 
-    def save(self, url, version, date, title, body):
+    def save(self, publisher, url, version, date, title, body):
         entry = {"url": url,
+                 "publisher": publisher,
                  "version": version,
                  "published_at": date,
                  "title": title,
@@ -50,11 +62,14 @@ class Articles(object):
             {"$sort": {"count": -1}},
             {"$match": {"count": {"$gt": 1}}}
         ])
-        return [i['_id'] for i in cursor]
+        modified_url = [i['_id'] for i in cursor]
+        log.info('loaded %s modified urls', len(modified_url))
+        return modified_url
 
     def load_modified_news(self):
         return list(self.articles.find({"url": {"$in": self.load_modified_url()}}).sort([('url', DESCENDING)]))[:100]
 
     def get_all_urls_older_than(self, interval):
+        log.info('getting urls older than %s minutes', interval)
         older_than = datetime.utcnow() - timedelta(seconds=interval * 60)
         return self.articles.find({"last_check": {"$lt": older_than}}).distinct('url')

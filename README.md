@@ -26,6 +26,10 @@ To track the log:
 
 	$ tail news_diff.log -f
 
+To start API handling:
+
+	$ gunicorn api:app
+
 To deactivate the virtual environment after use:
 
     $ deactivate
