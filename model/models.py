@@ -47,10 +47,8 @@ def by_order(order, sort_by):
 
 def get_meta(cursor, order, page, sort_by):
     count = cursor.count()
-    if count > page * ENTRIES:
-        next_url = ''.join(['/api/news?page=', page + 1, '&sort_by=', sort_by, '&order=', order])
-    else:
-        next_url = None
+    next_url = ''.join(['/api/news?page=', page + 1, '&sort_by=', sort_by, '&order=', order]) \
+        if count > page * ENTRIES else None
     meta = {"count": ENTRIES, "total_count": count, "next": next_url}
     return meta
 
