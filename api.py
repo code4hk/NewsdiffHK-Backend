@@ -16,7 +16,7 @@ class NewsResource:
     def __init__(self):
         self.articles = Articles()
 
-    def on_get(self, req, resp):
+    def on_get(self, req, resp, publisher_code=None):
         params = dict(parse_qsl(req.query_string))
         try:
             page = int(params.get('page', '1'))
@@ -27,7 +27,7 @@ class NewsResource:
             if order not in ['asc', 'desc']:
                 raise ValueError()
             resp.body = self.articles.load_modified_news(
-                page, sort_by, order, params.get('lang', 'all'))
+                page, sort_by, order, params.get('lang', 'all'), publisher_code)
         except ValueError:
             raise falcon.HTTPBadRequest('bad request', 'invalid query')
 
@@ -36,3 +36,4 @@ publishers = PublishersResource()
 app.add_route('/api/publishers', publishers)
 news = NewsResource()
 app.add_route('/api/news', news)
+app.add_route('/api/publisher/{publisher_code}/news', news)

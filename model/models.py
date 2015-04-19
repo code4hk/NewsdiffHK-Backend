@@ -8,7 +8,7 @@ from datetime import datetime
 from util.env import db_url
 from util import logger
 
-MAX_ENTRIES = 20
+ENTRIES = 20
 
 log = logger.get(__name__)
 
@@ -37,6 +37,22 @@ def matcher(base_revision, date, title, body):
                                base_revision['body']),
                            sequence(date, title, body),
                            False)
+
+
+def by_order(order, sort_by):
+    order = ASCENDING if order == 'asc' else DESCENDING
+    sort_by_field = 'comments_no' if sort_by == 'popular' else 'updated_at' if sort_by == 'time' else 'changes'
+    return [(sort_by_field, order)]
+
+
+def get_meta(cursor, order, page, sort_by):
+    count = cursor.count()
+    if count > page * ENTRIES:
+        next_url = ''.join(['/api/news?page=', page + 1, '&sort_by=', sort_by, '&order=', order])
+    else:
+        next_url = None
+    meta = {"count": ENTRIES, "total_count": count, "next": next_url}
+    return meta
 
 
 class Articles(object):
@@ -98,23 +114,17 @@ class Articles(object):
     def update_last_check_time(self, nid):
         self.news.update_one({"_id": nid}, {'$set': {"last_check": datetime.utcnow()}})
 
-    def load_modified_news(self, page, sort_by, order, lang):
-        order = ASCENDING if order == 'asc' else DESCENDING
-        sort_by_field = 'comments_no' if sort_by == 'popular' else 'updated_at' if sort_by == 'time' else 'changes'
+    def load_modified_news(self, page, sort_by, order, lang, publisher):
+        cursor = self.query(lang, publisher).sort(by_order(order, sort_by)).skip(ENTRIES * (page - 1)).limit(ENTRIES)
+        return dumps({'news': (list(cursor)), 'meta': (get_meta(cursor, order, page, sort_by))})
+
+    def query(self, lang, publisher_code):
         query = {'$where': 'this.created_at<this.updated_at'}
         if lang != 'all':
             query['lang'] = lang
-        cursor = self.news.find(query).sort([(sort_by_field, order)]).skip(MAX_ENTRIES * (page - 1)).limit(MAX_ENTRIES)
-        count = cursor.count()
-        if count > page * MAX_ENTRIES:
-            next_url = ''.join(['/api/news?page=', page + 1, '&sort_by=', sort_by, '&order=', order])
-        else:
-            next_url = None
-        return dumps({'news': (list(cursor)), 'meta': {
-            "count": MAX_ENTRIES,
-            "total_count": count,
-            "next": next_url
-        }})
+        if publisher_code:
+            query['publisher'] = publisher_code
+        return self.news.find(query)
 
     def get_all_urls_older_than(self, interval):
         log.info('getting urls older than %s minutes', interval)
