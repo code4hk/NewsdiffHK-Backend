@@ -45,9 +45,10 @@ def by_order(order, sort_by):
     return [(sort_by_field, order)]
 
 
-def get_meta(cursor, order, page, sort_by):
+def get_meta(cursor, order, page, sort_by, lang, publisher):
     count = cursor.count()
-    next_url = ''.join(['/api/news?page=', page + 1, '&sort_by=', sort_by, '&order=', order]) \
+    prefix = ''.join(['/api/publisher/', publisher, '/news']) if publisher else '/api/news'
+    next_url = ''.join([prefix, '?page=', str(page + 1), '&sort_by=', sort_by, '&order=', order, '&lang=', lang]) \
         if count > page * ENTRIES else None
     meta = {"count": ENTRIES, "total_count": count, "next": next_url}
     return meta
@@ -114,7 +115,7 @@ class Articles(object):
 
     def load_modified_news(self, page, sort_by, order, lang, publisher):
         cursor = self.query(lang, publisher).sort(by_order(order, sort_by)).skip(ENTRIES * (page - 1)).limit(ENTRIES)
-        return dumps({'news': (list(cursor)), 'meta': (get_meta(cursor, order, page, sort_by))})
+        return dumps({'news': (list(cursor)), 'meta': (get_meta(cursor, order, page, sort_by, lang, publisher))})
 
     def query(self, lang, publisher_code):
         query = {'$where': 'this.created_at<this.updated_at'}
