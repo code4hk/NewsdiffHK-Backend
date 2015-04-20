@@ -1,4 +1,5 @@
 from difflib import SequenceMatcher
+from bson.objectid import ObjectId
 from bson.json_util import dumps
 from pymongo import MongoClient
 from pymongo import DESCENDING
@@ -52,6 +53,23 @@ def get_meta(cursor, order, page, sort_by, lang, publisher):
         if count > page * ENTRIES else None
     meta = {"count": ENTRIES, "total_count": count, "next": next_url}
     return meta
+
+
+def diff_string(original, revision):
+    if not original or not revision:
+        return None
+    parts = []
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, original, revision, False).get_opcodes():
+        if tag == 'replace':
+            parts.append(''.join(['<o>', original[i1:i2], '</o>']))
+            parts.append(''.join(['<c>', revision[j1:j2], '</c>']))
+        elif tag == 'insert':
+            parts.append(''.join(['<c>', revision[j1:j2], '</c>']))
+        elif tag == 'delete':
+            parts.append(''.join(['<o>', original[i1:i2], '</o>']))
+        elif tag == 'equal':
+            parts.append(original[i1:i2])
+    return ''.join(parts)
 
 
 class Articles(object):
@@ -129,3 +147,17 @@ class Articles(object):
         log.info('getting urls older than %s minutes', interval)
         older_than = datetime.utcnow() - timedelta(seconds=interval * 60)
         return self.news.find({"last_check": {"$lt": older_than}}).distinct('url')
+
+    def load_article_history(self, news_id):
+        news = self.news.find({'_id': ObjectId(news_id)})[0]
+        revisions = list(self.revisions.find({'nid': news_id}, projection={'_id': 0, 'nid': 0}))
+        prev = None
+        for item in revisions:
+            body = item['body']
+            item['content'] = diff_string(prev, body)
+            prev = body
+        news['revisions'] = revisions
+        return dumps(news)
+
+
+
