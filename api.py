@@ -1,6 +1,6 @@
-from model.models import Publishers
+from model.publisher import Publishers
 from model.models import Articles
-from urllib.parse import parse_qsl
+from model.params import Params
 import falcon
 
 
@@ -17,17 +17,8 @@ class NewsResource:
         self.articles = Articles()
 
     def on_get(self, req, resp, publisher_code=None):
-        params = dict(parse_qsl(req.query_string))
         try:
-            page = int(params.get('page', '1'))
-            sort_by = params.get('sort_by', 'changes')
-            if sort_by not in ['popular', 'time', 'changes']:
-                raise ValueError()
-            order = params.get('order', 'desc')
-            if order not in ['asc', 'desc']:
-                raise ValueError()
-            resp.body = self.articles.load_modified_news(
-                page, sort_by, order, params.get('lang', 'all'), publisher_code)
+            resp.body = self.articles.load_modified_news(Params.from_req(req, publisher_code))
         except ValueError:
             raise falcon.HTTPBadRequest('bad request', 'invalid query')
 
