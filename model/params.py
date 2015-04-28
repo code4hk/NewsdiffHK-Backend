@@ -5,7 +5,34 @@ from pymongo import ASCENDING, DESCENDING
 ENTRIES = 20
 
 
-class Params(object):
+def validate(revision, revisions_count):
+    if revision < 0 or revision >= revisions_count:
+        raise ValueError("revision index out of bound! " + str(revision))
+    return revision
+
+
+class ArticlesParams(object):
+    def __init__(self, from_revision, to_revision):
+        self.from_revision = int(from_revision) if from_revision else None
+        self.to_revision = int(to_revision) if to_revision else None
+
+    def from_version(self, revisions_count):
+        from_revision = max(0, revisions_count - 2) if self.from_revision is None else self.from_revision
+        return validate(from_revision, revisions_count)
+
+    def to_version(self, revisions_count):
+        to_revision = max(0, revisions_count - 1) if self.to_revision is None else self.to_revision
+        return validate(to_revision, revisions_count)
+
+    @classmethod
+    def from_req(cls, req):
+        params = dict(parse_qsl(req.query_string))
+        from_revision = params.get('from_revision', None)
+        to_revision = params.get('to_revision', None)
+        return cls(from_revision, to_revision)
+
+
+class NewsParams(object):
     def __init__(self, page, sort_by, order, lang, publisher):
         self.page = page
         self.sort_by = sort_by
