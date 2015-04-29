@@ -2,6 +2,7 @@ from model.publisher import Publishers
 from model.models import Articles
 from model.params import ArticlesParams
 from model.params import NewsParams
+from model.params import SearchParams
 import falcon
 
 
@@ -24,6 +25,17 @@ class NewsResource:
             raise falcon.HTTPBadRequest('bad request', 'invalid query: ' + str(e))
 
 
+class SearchResource:
+    def __init__(self):
+        self.articles = Articles()
+
+    def on_get(self, req, resp):
+        try:
+            resp.body = self.articles.load_modified_news(SearchParams.from_req(req))
+        except ValueError as e:
+            raise falcon.HTTPBadRequest('bad request', 'invalid query: ' + str(e))
+
+
 class ArticleResource:
     def __init__(self):
         self.articles = Articles()
@@ -34,11 +46,14 @@ class ArticleResource:
         except ValueError as e:
             raise falcon.HTTPBadRequest('bad request', 'invalid query: ' + str(e))
 
+
 app = falcon.API()
 publishers = PublishersResource()
 app.add_route('/api/publishers', publishers)
 news = NewsResource()
 app.add_route('/api/news', news)
 app.add_route('/api/publisher/{publisher_code}/news', news)
+search = SearchResource()
+app.add_route('/api/search/news', search)
 article = ArticleResource()
 app.add_route('/api/news/{news_id}', article)
